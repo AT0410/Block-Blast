@@ -12,6 +12,7 @@ SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.init()
 pygame.display.set_caption("Block Blast")
 
+
 class BlockBlast:
     def __init__(self):
         # Colours
@@ -38,7 +39,7 @@ class BlockBlast:
             [[1], [1], [1], [1]],  # vertical 4 line
             [[1, 0, 0], [1, 1, 1]],  # l shape
         ]
-        
+
         # preview blocks
         self.current_blocks = self.get_current_blocks()
         self.preview_block_rects = []
@@ -90,7 +91,6 @@ class BlockBlast:
         # Draws a block following the mouse.
         block, colour = self.current_blocks[dragging_idx]
         offsetx, offsety = pos
-        print(pos)
         # (Align to mouse: center block on cursor)
         block_w = len(block[0]) * self.cell_size
         block_h = len(block) * self.cell_size
@@ -164,7 +164,7 @@ class BlockBlast:
                 if not block[r][c]:
                     continue
                 row, col = top + r, left + c
-                if not (0 <= row < self.grid_size and 0 <= col < self.grid_size):  # fixed typo here!
+                if not (0 <= row < self.grid_size and 0 <= col < self.grid_size):
                     return False
                 if self.grid[row][col] != self.grid_bg_colour:
                     return False
@@ -186,13 +186,15 @@ class BlockBlast:
                 return i
         return -1
 
-    def mouse_to_grid(self, mouse_pos: Tuple[int, int], dragging_i: int) -> Tuple[int, int]:
+    def mouse_to_grid(
+        self, mouse_pos: Tuple[int, int], dragging_i: int
+    ) -> Tuple[int, int]:
         block, _ = self.current_blocks[dragging_i]
-        
+
         # which cell is topleft of block in
         mouse_x, mouse_y = mouse_pos
-        block_w = len(block[0]) * self.cell_size
-        block_h = len(block) * self.cell_size
+        block_w = len(block[0]) * (self.cell_size - 10)
+        block_h = len(block) * (self.cell_size - 10)
         block_x = mouse_x - block_w // 2
         block_y = mouse_y - block_h // 2
         grid_x, grid_y = self.grid_topleft
@@ -202,12 +204,60 @@ class BlockBlast:
         row = rel_y // self.cell_size
         return (int(row), int(col))
 
+    def clear(self):
+        # rows
+        clear_row_i = []
+        for i in range(self.grid_size):
+            clear = True
+            for cell in self.grid[i]:
+                if cell == self.grid_bg_colour:
+                    clear = False
+                    break
+            if clear:
+                clear_row_i.append(i)
+
+        # cols
+        clear_col_i = []
+        for j in range(self.grid_size):
+            clear = True
+            for i in range(self.grid_size):
+                cell = self.grid[i][j]
+                if cell == self.grid_bg_colour:
+                    clear = False
+                    break
+            if clear:
+                clear_col_i.append(j)
+
+        for i in clear_row_i:
+            for j in range(self.grid_size):
+                self.grid[i][j] = self.grid_bg_colour
+
+        for j in clear_col_i:
+            for i in range(self.grid_size):
+                self.grid[i][j] = self.grid_bg_colour
+
+    def is_game_over(self) -> bool:
+        def is_block_placable(block):
+            for r in range(self.grid_size):
+                for c in range(self.grid_size):
+                    if self.can_place_block(block, r, c):
+                        return True
+            print(f"Block {block} not placable")
+            return False
+
+        for i in range(3):
+            if not self.placed_preview[i]:
+                if is_block_placable(self.current_blocks[i][0]):
+                    return False
+        return True
+
+
 # Main loop with drag-n-drop
 def main():
     run = True
     clock = pygame.time.Clock()
     block_blast = BlockBlast()
-    
+
     # Preview block drag
     dragging = False
     dragging_i = None
@@ -222,7 +272,11 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not dragging:
+            elif (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 1
+                and not dragging
+            ):
                 # Check if clicking on one of the previewed blocks to drag
                 mouse_pos = pygame.mouse.get_pos()
                 i = block_blast.block_preview_at_pos(mouse_pos)
@@ -231,7 +285,9 @@ def main():
                     dragging_i = i
                     drag_pos = mouse_pos
 
-            elif event.type == pygame.MOUSEMOTION and dragging_i is not None and dragging:
+            elif (
+                event.type == pygame.MOUSEMOTION and dragging_i is not None and dragging
+            ):
                 drag_pos = event.pos
 
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and dragging:
@@ -240,21 +296,32 @@ def main():
                 block, colour = block_blast.current_blocks[dragging_i]
                 if block_blast.can_place_block(block, grid_row, grid_col):
                     block_blast.place_block(block, grid_row, grid_col, colour)
-                    
+                    block_blast.clear()
+                    if block_blast.is_game_over():
+                        print("GAME OVER")
+
                     # Mark block as placed
                     block_blast.placed_preview[dragging_i] = True
-                    
+
                     # Refill blocks when all placed
                     if all(block_blast.placed_preview):
                         block_blast.current_blocks = block_blast.get_current_blocks()
                         block_blast.placed_preview = [False, False, False]
                         
+                        while block_blast.is_game_over():
+                            block_blast.current_blocks = (
+                                block_blast.get_current_blocks()
+                            )
+                            print("GETTING")
+
+
                 # Stop dragging
                 dragging = False
                 dragging_i = None
 
         pygame.display.flip()
         clock.tick(FPS)
+
 
 if __name__ == "__main__":
     main()
