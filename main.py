@@ -33,17 +33,71 @@ class BlockBlast:
             [self.grid_bg_colour] * self.grid_size for _ in range(self.grid_size)
         ]
         self.block_shapes = [
+            [[1, 1, 1]],  # horizontal 3 line
             [[1, 1, 1, 1]],  # horizontal 4 line
+            [[1, 1, 1, 1, 1]],  # horizontal 5 line
+            [[1], [1], [1]],  # vertical 3 line
+            [[1], [1], [1], [1]],  # vertical 4 line
+            [[1], [1], [1], [1], [1]],  # vertical 5 line
             [[1, 1], [1, 1]],  # 2x2 square
             [[1, 1, 1], [1, 1, 1], [1, 1, 1]],  # 3x3 square
-            [[1], [1], [1], [1]],  # vertical 4 line
-            [[1, 0, 0], [1, 1, 1]],  # l shape
+            [[1, 1], [1, 1], [1, 1]],  # 3x2 square
+            [[1, 1, 1], [1, 1, 1]],  # 2x3 square
+            [[1, 0, 0], [1, 1, 1]],  # horizontal l shape
+            [[0, 0, 1], [1, 1, 1]],  # horizontal l shape
+            [[1, 1, 1], [0, 0, 1]],  # horizontal l shape
+            [[1, 1, 1], [1, 0, 0]],  # horizontal l shape
+            [[1, 0], [1, 0], [1, 1]],  # vertical l shape
+            [[0, 1], [0, 1], [1, 1]],  # vertical l shape
+            [[1, 1], [0, 1], [0, 1]],  # vertical l shape
+            [[1, 1], [1, 0], [1, 0]],  # vertical l shape
+            [[1, 0, 0], [1, 0, 0], [1, 1, 1]],  # L shape
+            [[0, 0, 1], [0, 0, 1], [1, 1, 1]],  # L shape
+            [[1, 1, 1], [0, 0, 1], [0, 0, 1]],  # L shape
+            [[1, 1, 1], [1, 0, 0], [1, 0, 0]],  # L shape
+            [[1, 1], [1, 0]],  # r shape
+            [[1, 1], [0, 1]],  # r shape
+            [[1, 0], [1, 1]],  # r shape
+            [[0, 1], [1, 1]],  # r shape
+            [[0, 1], [1, 1], [0, 1]],  # t shape
+            [[1, 0], [1, 1], [1, 0]],  # t shape
+            [[0, 1, 0], [1, 1, 1]],  # t shape
+            [[1, 1, 1], [0, 1, 0]],  # t shape
+            [[1, 1, 0], [0, 1, 1]],  # z shape
+            [[0, 1, 1], [1, 1, 0]],  # z shape
+            [[0, 1], [1, 1], [1, 0]],  # z shape
+            [[1, 0], [1, 1], [0, 1]],  # z shape
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],  # 3x3 diagonal
+            [[0, 0, 1], [0, 1, 0], [1, 0, 0]],
+        ]
+
+        self.special_block_shapes = [
+            [[1], [1]],  # vertical 2 line
+            [[1, 1]],  # horizontal 2 line
+            [[1, 0, 1], [1, 1, 1]],  # U shape
+            [[1, 1, 1], [1, 0, 1]],  # U shape
+            [[1, 1], [1, 0], [1, 1]],  # U shape
+            [[1, 1], [0, 1], [1, 1]],  # U shape
+            [[1, 0], [0, 1]],
+            [[0, 1], [1, 0]],
         ]
 
         # preview blocks
-        self.current_blocks = self.get_current_blocks()
+        self.current_blocks = self.get_preview_blocks()
         self.preview_block_rects = []
         self.placed_preview = [False, False, False]
+
+        # scoring
+        self.score = 0
+        self.combo = 0
+        self.clear_multipler = [1, 2, 6, 12, 24, 48]
+        self.since_clear = 0
+
+    def draw_score(self):
+        font = pygame.font.SysFont(None, 48)
+        score_surf = font.render(f"{self.score}", True, (40, 40, 40))
+        score_rect = score_surf.get_rect(center=(SCREEN_WIDTH // 2, 60))
+        SCREEN.blit(score_surf, score_rect)
 
     def draw_current_blocks(self, dragging_i=None):
         # Draw the 3 current blocks spaced evenly under the grid
@@ -145,16 +199,23 @@ class BlockBlast:
                 pygame.draw.rect(SCREEN, colour, rect)
 
     def draw_board(self, dragging_i, drag_pos):
+        self.draw_score()
         self.draw_grid_lines()
         self.draw_blocks()
         self.draw_current_blocks(dragging_i=dragging_i)
         if dragging_i is not None:
             self.draw_dragging_block(dragging_i, drag_pos)
 
-    def get_current_blocks(self):
+    def get_preview_blocks(self):
         return [
             (random.choice(self.block_shapes), random.choice(self.block_colours))
             for _ in range(3)
+        ]
+
+    def get_preview_special_blocks(self):
+        all_blocks = self.block_shapes + self.special_block_shapes
+        return [
+            (random.choice(all_blocks), random.choice(all_blocks)) for _ in range(3)
         ]
 
     def can_place_block(self, block, top, left):
@@ -177,6 +238,7 @@ class BlockBlast:
                     continue
                 row, col = top + r, left + c
                 self.grid[row][col] = colour
+                self.score += 1
 
     def block_preview_at_pos(self, pos: Tuple[int, int]) -> int:
         """Returns (block_idx, block_rect) if pos is inside a block preview"""
@@ -204,7 +266,7 @@ class BlockBlast:
         row = rel_y // self.cell_size
         return (int(row), int(col))
 
-    def clear(self):
+    def clear(self) -> int:
         # rows
         clear_row_i = []
         for i in range(self.grid_size):
@@ -236,13 +298,21 @@ class BlockBlast:
             for i in range(self.grid_size):
                 self.grid[i][j] = self.grid_bg_colour
 
+        return len(clear_row_i) + +len(clear_col_i)
+
+    def all_clear(self) -> bool:
+        for r in self.grid:
+            for cell in r:
+                if cell != self.grid_bg_colour:
+                    return False
+        return True
+
     def is_game_over(self) -> bool:
         def is_block_placable(block):
             for r in range(self.grid_size):
                 for c in range(self.grid_size):
                     if self.can_place_block(block, r, c):
                         return True
-            print(f"Block {block} not placable")
             return False
 
         for i in range(3):
@@ -296,7 +366,22 @@ def main():
                 block, colour = block_blast.current_blocks[dragging_i]
                 if block_blast.can_place_block(block, grid_row, grid_col):
                     block_blast.place_block(block, grid_row, grid_col, colour)
-                    block_blast.clear()
+                    clear_num = block_blast.clear()
+                    block_blast.since_clear += 1
+                    if clear_num > 0:
+                        print(clear_num)
+                        block_blast.score += (
+                            (block_blast.combo + 1)
+                            * 10
+                            * block_blast.clear_multipler[clear_num - 1]
+                        )
+                        block_blast.combo += 1
+                        block_blast.since_clear = 0
+                        if block_blast.all_clear():
+                            block_blast.score += 300
+                    if block_blast.since_clear >= 3:
+                        block_blast.combo = 0
+
                     if block_blast.is_game_over():
                         print("GAME OVER")
 
@@ -305,15 +390,13 @@ def main():
 
                     # Refill blocks when all placed
                     if all(block_blast.placed_preview):
-                        block_blast.current_blocks = block_blast.get_current_blocks()
+                        block_blast.current_blocks = block_blast.get_preview_blocks()
                         block_blast.placed_preview = [False, False, False]
-                        
+
                         while block_blast.is_game_over():
                             block_blast.current_blocks = (
-                                block_blast.get_current_blocks()
+                                block_blast.get_preview_special_blocks()
                             )
-                            print("GETTING")
-
 
                 # Stop dragging
                 dragging = False
