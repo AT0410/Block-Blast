@@ -51,7 +51,7 @@ def main():
                 if block_blast.can_place_block(grid, block, grid_row, grid_col):
                     block_blast.place_block(grid, block, grid_row, grid_col, colour)
                     clear_num = block_blast.clear(grid)
-                    block_blast.increment_score(grid, block, clear_num)
+                    block_blast.score += block_blast.get_score_increment(grid, block, clear_num)
                     if block_blast.is_game_over(grid):
                         gameover = True
 

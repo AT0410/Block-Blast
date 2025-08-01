@@ -302,19 +302,19 @@ class BlockBlast:
 
         return len(clear_row_i) + +len(clear_col_i)
 
-    def increment_score(self, grid, block, clear_num):
-        self.score += len([cell for row in block for cell in row if cell == 1])
+    def get_score_increment(self, grid, block, clear_num):
+        score = len([cell for row in block for cell in row if cell == 1])
         self.since_clear += 1
         if clear_num > 0:
-            self.score += (self.combo + 1) * 10 * self.clear_multiplier[clear_num - 1]
-            print(self.score)
+            score += (self.combo + 1) * 10 * self.clear_multiplier[clear_num - 1]
             self.combo += 1
             self.since_clear = 0
             if self.all_clear(grid):
                 print("ALL CLEAR")
-                self.score += 300
+                score += 300
         if self.since_clear >= 3:
             self.combo = 0
+        return score
 
     def all_clear(self, grid) -> bool:
         for r in grid:
