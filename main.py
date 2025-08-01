@@ -2,6 +2,7 @@ import pygame
 import sys
 import random
 from typing import Tuple
+import copy
 
 # Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 480, 800
@@ -90,9 +91,11 @@ class BlockBlast:
         # scoring
         self.score = 0
         self.combo = 0
-        self.clear_multipler = [1, 2, 6, 12, 24, 48]
+        self.clear_multiplier = [1, 2, 6, 12, 24, 48]
         self.since_clear = 0
 
+    ########################################################################
+    # DRAW FUNCTIONS
     def draw_score(self):
         font = pygame.font.SysFont(None, 48)
         score_surf = font.render(f"{self.score}", True, (40, 40, 40))
@@ -206,6 +209,31 @@ class BlockBlast:
         if dragging_i is not None:
             self.draw_dragging_block(dragging_i, drag_pos)
 
+    def draw_gameover(self):
+        """Draw big 'GAME OVER' text in the middle of the screen"""
+        # Create semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)  # Semi-transparent
+        overlay.fill((0, 0, 0))  # Black overlay
+        SCREEN.blit(overlay, (0, 0))
+        
+        # Main "GAME OVER" text
+        font_large = pygame.font.SysFont(None, 72)
+        game_over_text = font_large.render("GAME OVER", True, (255, 255, 255))
+        game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
+        SCREEN.blit(game_over_text, game_over_rect)
+        
+        # Final score text
+        font_medium = pygame.font.SysFont(None, 48)
+        score_text = font_medium.render(f"Final Score: {self.score}", True, (255, 255, 255))
+        score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+        SCREEN.blit(score_text, score_rect)
+
+        
+
+    ########################################################################
+    # GAME FUNCTIONS
+
     def get_preview_blocks(self):
         return [
             (random.choice(self.block_shapes), random.choice(self.block_colours))
@@ -215,10 +243,10 @@ class BlockBlast:
     def get_preview_special_blocks(self):
         all_blocks = self.block_shapes + self.special_block_shapes
         return [
-            (random.choice(all_blocks), random.choice(all_blocks)) for _ in range(3)
+            (random.choice(all_blocks), random.choice(self.block_colours)) for _ in range(3)
         ]
 
-    def can_place_block(self, block, top, left):
+    def can_place_block(self, grid, block, top, left):
         """Check if block placement is valid"""
         for r in range(len(block)):
             for c in range(len(block[0])):
@@ -227,18 +255,90 @@ class BlockBlast:
                 row, col = top + r, left + c
                 if not (0 <= row < self.grid_size and 0 <= col < self.grid_size):
                     return False
-                if self.grid[row][col] != self.grid_bg_colour:
+                if grid[row][col] != self.grid_bg_colour:
                     return False
         return True
 
-    def place_block(self, block, top, left, colour):
+    def place_block(self, grid, block, top, left, colour):
         for r in range(len(block)):
             for c in range(len(block[0])):
                 if not block[r][c]:
                     continue
                 row, col = top + r, left + c
-                self.grid[row][col] = colour
-                self.score += 1
+                grid[row][col] = colour
+
+
+    def clear(self, grid) -> int:
+        # rows
+        clear_row_i = []
+        for i in range(self.grid_size):
+            clear = True
+            for cell in grid[i]:
+                if cell == self.grid_bg_colour:
+                    clear = False
+                    break
+            if clear:
+                clear_row_i.append(i)
+
+        # cols
+        clear_col_i = []
+        for j in range(self.grid_size):
+            clear = True
+            for i in range(self.grid_size):
+                cell = grid[i][j]
+                if cell == self.grid_bg_colour:
+                    clear = False
+                    break
+            if clear:
+                clear_col_i.append(j)
+
+        for i in clear_row_i:
+            for j in range(self.grid_size):
+                grid[i][j] = self.grid_bg_colour
+
+        for j in clear_col_i:
+            for i in range(self.grid_size):
+                grid[i][j] = self.grid_bg_colour
+
+        return len(clear_row_i) + +len(clear_col_i)
+
+    def increment_score(self, grid, block, clear_num):
+        self.score += len([cell for row in block for cell in row if cell == 1])
+        self.since_clear += 1
+        if clear_num > 0:
+            self.score += (self.combo + 1) * 10 * self.clear_multiplier[clear_num - 1]
+            print(self.score)
+            self.combo += 1
+            self.since_clear = 0
+            if self.all_clear(grid):
+                print("ALL CLEAR")
+                self.score += 300
+        if self.since_clear >= 3:
+            self.combo = 0
+
+    def all_clear(self, grid) -> bool:
+        for r in grid:
+            for cell in r:
+                if cell != self.grid_bg_colour:
+                    return False
+        return True
+
+    def is_game_over(self, grid) -> bool:
+        def is_block_placable(block):
+            for r in range(self.grid_size):
+                for c in range(self.grid_size):
+                    if self.can_place_block(grid, block, r, c):
+                        return True
+            return False
+
+        for i in range(3):
+            if not self.placed_preview[i]:
+                if is_block_placable(self.current_blocks[i][0]):
+                    return False
+        return True
+
+    ########################################################################
+    # UTIL FUNCTIONS
 
     def block_preview_at_pos(self, pos: Tuple[int, int]) -> int:
         """Returns (block_idx, block_rect) if pos is inside a block preview"""
@@ -266,145 +366,5 @@ class BlockBlast:
         row = rel_y // self.cell_size
         return (int(row), int(col))
 
-    def clear(self) -> int:
-        # rows
-        clear_row_i = []
-        for i in range(self.grid_size):
-            clear = True
-            for cell in self.grid[i]:
-                if cell == self.grid_bg_colour:
-                    clear = False
-                    break
-            if clear:
-                clear_row_i.append(i)
-
-        # cols
-        clear_col_i = []
-        for j in range(self.grid_size):
-            clear = True
-            for i in range(self.grid_size):
-                cell = self.grid[i][j]
-                if cell == self.grid_bg_colour:
-                    clear = False
-                    break
-            if clear:
-                clear_col_i.append(j)
-
-        for i in clear_row_i:
-            for j in range(self.grid_size):
-                self.grid[i][j] = self.grid_bg_colour
-
-        for j in clear_col_i:
-            for i in range(self.grid_size):
-                self.grid[i][j] = self.grid_bg_colour
-
-        return len(clear_row_i) + +len(clear_col_i)
-
-    def all_clear(self) -> bool:
-        for r in self.grid:
-            for cell in r:
-                if cell != self.grid_bg_colour:
-                    return False
-        return True
-
-    def is_game_over(self) -> bool:
-        def is_block_placable(block):
-            for r in range(self.grid_size):
-                for c in range(self.grid_size):
-                    if self.can_place_block(block, r, c):
-                        return True
-            return False
-
-        for i in range(3):
-            if not self.placed_preview[i]:
-                if is_block_placable(self.current_blocks[i][0]):
-                    return False
-        return True
-
-
-# Main loop with drag-n-drop
-def main():
-    run = True
-    clock = pygame.time.Clock()
-    block_blast = BlockBlast()
-
-    # Preview block drag
-    dragging = False
-    dragging_i = None
-    drag_pos = (0, 0)
-    while run:
-        # Draw
-        SCREEN.fill(BG_COLOR)
-        block_blast.draw_board(dragging_i=dragging_i, drag_pos=drag_pos)
-
-        # Handle events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-
-            elif (
-                event.type == pygame.MOUSEBUTTONDOWN
-                and event.button == 1
-                and not dragging
-            ):
-                # Check if clicking on one of the previewed blocks to drag
-                mouse_pos = pygame.mouse.get_pos()
-                i = block_blast.block_preview_at_pos(mouse_pos)
-                if i >= 0:
-                    dragging = True
-                    dragging_i = i
-                    drag_pos = mouse_pos
-
-            elif (
-                event.type == pygame.MOUSEMOTION and dragging_i is not None and dragging
-            ):
-                drag_pos = event.pos
-
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and dragging:
-                # Attempt to place block on main grid if released
-                grid_row, grid_col = block_blast.mouse_to_grid(drag_pos, dragging_i)
-                block, colour = block_blast.current_blocks[dragging_i]
-                if block_blast.can_place_block(block, grid_row, grid_col):
-                    block_blast.place_block(block, grid_row, grid_col, colour)
-                    clear_num = block_blast.clear()
-                    block_blast.since_clear += 1
-                    if clear_num > 0:
-                        print(clear_num)
-                        block_blast.score += (
-                            (block_blast.combo + 1)
-                            * 10
-                            * block_blast.clear_multipler[clear_num - 1]
-                        )
-                        block_blast.combo += 1
-                        block_blast.since_clear = 0
-                        if block_blast.all_clear():
-                            block_blast.score += 300
-                    if block_blast.since_clear >= 3:
-                        block_blast.combo = 0
-
-                    if block_blast.is_game_over():
-                        print("GAME OVER")
-
-                    # Mark block as placed
-                    block_blast.placed_preview[dragging_i] = True
-
-                    # Refill blocks when all placed
-                    if all(block_blast.placed_preview):
-                        block_blast.current_blocks = block_blast.get_preview_blocks()
-                        block_blast.placed_preview = [False, False, False]
-
-                        while block_blast.is_game_over():
-                            block_blast.current_blocks = (
-                                block_blast.get_preview_special_blocks()
-                            )
-
-                # Stop dragging
-                dragging = False
-                dragging_i = None
-
-        pygame.display.flip()
-        clock.tick(FPS)
-
-
-if __name__ == "__main__":
-    main()
+    def get_deepcopy(self):
+        return copy.deepcopy(self.grid)
