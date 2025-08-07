@@ -1,7 +1,7 @@
 import copy
 from typing import List, Tuple, Optional
 import numpy as np
-from main import BlockBlast, SCREEN, FPS, BG_COLOR
+from blockblast import BlockBlast, SCREEN, FPS, BG_COLOR
 import pygame
 from itertools import permutations
 

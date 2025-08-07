@@ -1,8 +1,8 @@
 import pygame
-from main import BlockBlast, SCREEN, BG_COLOR, FPS
+from blockblast import BlockBlast, SCREEN, BG_COLOR, FPS
 
 # Main loop with drag-n-drop
-def main():
+def main_player():
     run = True
     clock = pygame.time.Clock()
     block_blast = BlockBlast()
@@ -76,4 +76,4 @@ def main():
         clock.tick(FPS)
 
 if __name__ == "__main__":
-    main()
+    main_player()
