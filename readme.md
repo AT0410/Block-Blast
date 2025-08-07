@@ -3,8 +3,12 @@ A Python implementation of the popular Block Blast puzzle game featuring both hu
 # About
 Block-Blast is a strategic puzzle game where players must place various shaped blocks on a grid to clear lines and score points. This repository contains a complete implementation with support for both manual gameplay and automated AI decision-making.
 
+# Preqrequisites
+- Python 3.7 or higher
+- `pygame` library (`pip install pygame`)
+
 # Usage
-run "python main.py [ai | player]" in terminal
+run `python main.py [ai | player]` in terminal
 
 ## AI: 
 - press A to autorun
